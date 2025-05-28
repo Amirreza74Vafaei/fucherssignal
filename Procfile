@@ -1,1 +1,0 @@
-python fucherssignal/main.py
