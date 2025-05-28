@@ -152,7 +152,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-
     if data == 'full_report':
         report = []
         for symbol in SYMBOLS:
