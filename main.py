@@ -1,3 +1,4 @@
+# Railway-ready, no proxy needed
 import ccxt
 import pandas as pd
 import ta
@@ -7,13 +8,11 @@ import time
 from config import TELEGRAM_TOKEN, CHAT_ID, SYMBOLS, TIMEFRAME
 import requests
 import asyncio
-from telegram.request import HTTPXRequest
 from telegram.constants import ParseMode
 import matplotlib.pyplot as plt
 import io
 import matplotlib.dates as mdates
 from datetime import datetime
-import os
 
 exchange = ccxt.binance({'options': {'defaultType': 'future'}})
 
@@ -23,10 +22,9 @@ def fetch_data(symbol):
     ohlcv = exchange.fetch_ohlcv(symbol, timeframe=TIMEFRAME, limit=150)
     df = pd.DataFrame(ohlcv, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
     return df
+
 def get_support_resistance(df, window=20):
-    # حمایت: کمترین قیمت در بازه اخیر
     support = df['low'].tail(window).min()
-    # مقاومت: بیشترین قیمت در بازه اخیر
     resistance = df['high'].tail(window).max()
     return support, resistance
 
@@ -38,22 +36,17 @@ def analyze(df):
     df['ema_20'] = ta.trend.EMAIndicator(df['close'], window=20).ema_indicator()
     df['ema_50'] = ta.trend.EMAIndicator(df['close'], window=50).ema_indicator()
     df['sma_20'] = ta.trend.SMAIndicator(df['close'], window=20).sma_indicator()
-
     last = df.iloc[-1]
     prev = df.iloc[-2]
     support, resistance = get_support_resistance(df)
     signal = "سیگنال خنثی (Hold)"
     explanation = []
-
     price = last['close']
     volume = last['volume']
     sma20 = last['sma_20']
-
-    # مناطق لیکوییدیتی ساده: قیمت کندلی که بیشترین حجم را در ۲۰ کندل اخیر داشته
     recent = df.tail(20)
     max_vol_idx = recent['volume'].idxmax()
     liquidity_price = recent.loc[max_vol_idx, 'close']
-
     if last['rsi'] < 30 and prev['macd'] < prev['macd_signal'] and last['macd'] > last['macd_signal'] and last['ema_20'] > last['ema_50']:
         signal = "سیگنال ورود (Long)"
         explanation.append("RSI زیر ۳۰ است (اشباع فروش). MACD کراس به بالا دارد. EMA20 بالای EMA50 است.")
@@ -62,7 +55,6 @@ def analyze(df):
         explanation.append("RSI بالای ۷۰ است (اشباع خرید). MACD کراس به پایین دارد. EMA20 زیر EMA50 است.")
     else:
         explanation.append("شرایط ورود یا خروج قوی مشاهده نشد. منتظر بمانید.")
-
     explanation.append(f"قیمت فعلی: {price:.4f}")
     explanation.append(f"حجم خرید (آخرین کندل): {volume:.2f}")
     explanation.append(f"SMA20: {sma20:.2f}")
@@ -82,7 +74,7 @@ async def send_long_message(bot, chat_id, text, symbol="گزارش"):
             await bot.send_message(chat_id=chat_id, text=f"{symbol} ({TIMEFRAME}) - بخش {idx+1}:\n{part}")
 
 def fetch_news():
-    API_KEY = 'abb4f276e15860b14ef352bc376f0f4b38c8f231'  # کلید خودت را اینجا قرار بده
+    API_KEY = 'abb4f276e15860b14ef352bc376f0f4b38c8f231'
     url = f'https://cryptopanic.com/api/v1/posts/?auth_token={API_KEY}&public=true'
     try:
         response = requests.get(url)
@@ -97,7 +89,6 @@ def fetch_news():
 def fetch_tradingview_ideas():
     return "ایده‌های جدید تحلیل‌گران را در https://www.tradingview.com/ideas/btcusd/ ببینید."
 
-# --- Chart Generation ---
 def generate_chart(df, symbol, timeframe):
     df['datetime'] = pd.to_datetime(df['time'], unit='ms')
     plt.figure(figsize=(10, 5))
@@ -116,7 +107,6 @@ def generate_chart(df, symbol, timeframe):
     plt.close()
     return buf
 
-# --- Enhanced Handlers ---
 def get_main_menu():
     keyboard = [
         [InlineKeyboardButton("📊 گزارش کلی", callback_data='full_report')],
@@ -162,7 +152,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-
     if data == 'full_report':
         report = []
         for symbol in SYMBOLS:
@@ -199,10 +188,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = get_timeframe_menu(symbol)
         await query.edit_message_text(f"تایم‌فریم مورد نظر را برای {symbol} انتخاب کنید:", reply_markup=reply_markup)
     elif data.startswith('signal_'):
-        # data format: signal_SYMBOL_TIMEFRAME
         try:
             _, symbol, tf = data.split('_', 2)
-            # fetch and analyze with selected timeframe
             ohlcv = exchange.fetch_ohlcv(symbol, timeframe=tf, limit=150)
             df = pd.DataFrame(ohlcv, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
             signal, explanation = analyze(df)
@@ -214,7 +201,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت به منو", callback_data='back_to_menu')]])
             await query.edit_message_text(text, reply_markup=reply_markup)
     elif data.startswith('chart_'):
-        # data format: chart_SYMBOL_TIMEFRAME
         try:
             _, symbol, tf = data.split('_', 2)
             ohlcv = exchange.fetch_ohlcv(symbol, timeframe=tf, limit=150)
@@ -230,7 +216,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await context.bot.send_message(chat_id=query.message.chat.id, text="خطا در دریافت یا رسم چارت.")
     elif data == 'back_to_menu':
-        # حذف پیام چارت اگر وجود دارد
         last_chart_msg_id = context.user_data.get('last_chart_msg_id')
         if last_chart_msg_id:
             try:
@@ -274,7 +259,6 @@ async def alert_job(context: ContextTypes.DEFAULT_TYPE):
         try:
             df = fetch_data(symbol)
             signal, explanation = analyze(df)
-            # فقط اگر سیگنال جدید ورود یا خروج بود و با قبلی فرق داشت، آلارم بده
             if symbol not in last_signals or last_signals[symbol] != signal:
                 if signal in ["سیگنال ورود (Long)", "سیگنال خروج (Short)"]:
                     text = f"⏰ آلارم سیگنال جدید!\n{symbol} ({TIMEFRAME}): {signal}\n{explanation}"
