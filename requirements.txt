@@ -1,7 +1,6 @@
 numpy==1.24.3
-python-telegram-bot[socks]==20.3
+python-telegram-bot[job-queue]==20.3
 ccxt==4.0.91
 pandas==2.0.3
 ta==0.10.2
 matplotlib==3.7.1
-httpx[socks]
