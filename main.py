@@ -1,4 +1,3 @@
-# Railway-ready, no proxy needed
 import ccxt
 import pandas as pd
 import ta
@@ -12,10 +11,8 @@ from telegram.constants import ParseMode
 import matplotlib.pyplot as plt
 import io
 import matplotlib.dates as mdates
-from datetime import datetime
 
 exchange = ccxt.binance({'options': {'defaultType': 'future'}})
-
 TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d']
 
 def fetch_data(symbol):
